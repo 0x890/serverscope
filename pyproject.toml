@@ -1,0 +1,75 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "serverscope"
+version = "0.1.0"
+description = "Enterprise infrastructure discovery and server utilization analysis framework"
+readme = "README.md"
+requires-python = ">=3.13"
+license = { text = "MIT" }
+dependencies = [
+    "pydantic>=2.7",
+    "PyYAML>=6.0",
+    "jinja2>=3.1",
+]
+
+[project.optional-dependencies]
+linux = ["asyncssh>=2.14"]
+windows = ["pywinrm>=0.4"]
+ad = ["ldap3>=2.9"]
+vmware = ["pyvmomi>=8.0"]
+proxmox = ["proxmoxer>=2.0", "requests>=2.31"]
+aws = ["boto3>=1.34"]
+azure = ["azure-identity>=1.15", "azure-mgmt-compute>=30.0", "azure-monitor-query>=1.2"]
+gcp = ["google-cloud-compute>=1.15", "google-cloud-monitoring>=2.19"]
+ml = ["numpy>=1.26", "scikit-learn>=1.4"]
+excel = ["openpyxl>=3.1"]
+pdf = ["weasyprint>=61"]
+vault = ["hvac>=2.1"]
+all = [
+    "serverscope[linux,windows,ad,vmware,proxmox,aws,azure,gcp,ml,excel,pdf,vault]",
+]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "mypy>=1.9", "ruff>=0.4"]
+
+[project.scripts]
+serverscope = "serverscope.cli:main"
+
+# Third-party packages can register collectors here (plugin mechanism).
+[project.entry-points."serverscope.collectors"]
+linux_ssh = "serverscope.collector.linux.ssh_collector:LinuxSSHCollector"
+windows_winrm = "serverscope.collector.windows.winrm_collector:WindowsWinRMCollector"
+active_directory = "serverscope.collector.ad.ldap_collector:ActiveDirectoryCollector"
+vmware_vcenter = "serverscope.collector.vmware.vcenter_collector:VCenterCollector"
+proxmox = "serverscope.collector.proxmox.proxmox_collector:ProxmoxCollector"
+aws_ec2 = "serverscope.collector.cloud.aws:AwsEc2Collector"
+azure_vm = "serverscope.collector.cloud.azure:AzureVmCollector"
+gcp_gce = "serverscope.collector.cloud.gcp:GcpGceCollector"
+
+[project.entry-points."serverscope.reporters"]
+json = "serverscope.report.json_report:JsonReporter"
+csv = "serverscope.report.csv_report:CsvReporter"
+markdown = "serverscope.report.markdown_report:MarkdownReporter"
+html = "serverscope.report.html_report:HtmlReporter"
+excel = "serverscope.report.excel_report:ExcelReporter"
+pdf = "serverscope.report.pdf_report:PdfReporter"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+serverscope = ["report/templates/*.j2", "dashboard/templates/*.j2"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ServerScope Report</title>
+<style>
+ body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; margin: 2rem; color: #1c2733; }
+ h1 { border-bottom: 3px solid #2563eb; padding-bottom: .4rem; }
+ table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: .9rem; }
+ th, td { border: 1px solid #d7dee6; padding: .4rem .6rem; text-align: left; }
+ th { background: #eef2f7; }
+ .cards { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1rem 0; }
+ .card { background: #f6f8fa; border: 1px solid #d7dee6; border-radius: 8px; padding: 1rem 1.4rem; min-width: 140px; }
+ .card b { font-size: 1.6rem; display: block; }
+ .badge { padding: .1rem .5rem; border-radius: 10px; font-size: .8rem; color: #fff; }
+ .decommission_candidate,.zombie { background:#dc2626 } .forgotten,.hibernated { background:#ea580c }
+ .idle,.underutilized { background:#d97706 } .overloaded,.abnormal { background:#9333ea }
+ .misconfigured { background:#0891b2 } .active { background:#16a34a } .unknown { background:#6b7280 }
+ .bar { background:#e5e9ef; border-radius:4px; height:10px; width:110px; display:inline-block; vertical-align:middle; }
+ .bar i { display:block; height:100%; border-radius:4px; background:#2563eb; }
+</style>
+</head>
+<body>
+<h1>ServerScope — Infrastructure Utilization Report</h1>
+<p>Generated {{ ctx.generated_at.strftime('%Y-%m-%d %H:%M UTC') }}</p>
+
+<div class="cards">
+ <div class="card"><b>{{ ctx.total }}</b>Servers</div>
+ <div class="card"><b>{{ ctx.avg_health }}</b>Avg health</div>
+ <div class="card"><b>{{ ctx.decommission_candidates | length }}</b>Decommission</div>
+ <div class="card"><b>{{ ctx.idle_servers | length }}</b>Idle ≥60%</div>
+ <div class="card"><b>{{ ctx.critical_anomalies | length }}</b>Critical findings</div>
+</div>
+
+<h2>Server Inventory</h2>
+<table>
+<tr><th>Server</th><th>Platform</th><th>Classification</th><th>Health</th>
+    <th>Idle %</th><th>Abandonment %</th><th>Perf</th><th>Sec</th><th>Avail</th></tr>
+{% for r in ctx.results %}
+<tr>
+ <td>{{ r.hostname }}</td>
+ <td>{{ r.platform.value }}</td>
+ <td><span class="badge {{ r.classification.value }}">{{ r.classification.value }}</span></td>
+ <td><span class="bar"><i style="width:{{ r.scores.health }}%"></i></span> {{ r.scores.health }}</td>
+ <td>{{ r.scores.idle_probability }}</td>
+ <td>{{ r.scores.abandonment_probability }}</td>
+ <td>{{ r.performance_grade }}</td>
+ <td>{{ r.security_grade }}</td>
+ <td>{{ r.availability_grade }}</td>
+</tr>
+{% endfor %}
+</table>
+
+{% if ctx.decommission_candidates %}
+<h2>Decommission Candidates</h2>
+{% for r in ctx.decommission_candidates %}
+<h3>{{ r.hostname }} — {{ r.scores.abandonment_probability }}% abandonment probability</h3>
+<ul>
+ {% for reason in r.reasons %}<li>{{ reason }}</li>{% endfor %}
+ <li><b>Recommendation:</b> {{ r.recommendation }}</li>
+</ul>
+{% endfor %}
+{% endif %}
+
+{% if ctx.top_risks %}
+<h2>Top Risks</h2>
+<ul>
+{% for r in ctx.top_risks %}
+ <li><b>{{ r.hostname }}</b> (risk {{ r.scores.risk }}) —
+     {{ r.anomalies[0].description if r.anomalies else r.recommendation }}</li>
+{% endfor %}
+</ul>
+{% endif %}
+
+{% if ctx.quick_wins %}
+<h2>Quick Wins</h2>
+<ul>
+{% for r in ctx.quick_wins %}
+ <li><b>{{ r.hostname }}</b> — idle {{ r.scores.idle_probability }}%, criticality {{ r.scores.criticality }}</li>
+{% endfor %}
+</ul>
+{% endif %}
+
+{% if ctx.critical_anomalies %}
+<h2>Critical Findings</h2>
+<ul>
+{% for host, desc in ctx.critical_anomalies %}<li><b>{{ host }}</b>: {{ desc }}</li>{% endfor %}
+</ul>
+{% endif %}
+</body>
+</html>

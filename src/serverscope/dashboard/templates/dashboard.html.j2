@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ServerScope Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+ body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; margin: 0; background:#0f172a; color:#e2e8f0; }
+ header { padding: 1rem 2rem; background:#1e293b; display:flex; justify-content:space-between; align-items:center; }
+ h1 { margin:0; font-size:1.3rem; }
+ .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(420px,1fr)); gap:1rem; padding:1rem 2rem; }
+ .panel { background:#1e293b; border-radius:10px; padding:1rem; }
+ .panel h2 { font-size:.95rem; margin:.2rem 0 .8rem; color:#94a3b8; }
+ table { width:100%; border-collapse:collapse; font-size:.85rem; }
+ th,td { padding:.35rem .5rem; border-bottom:1px solid #334155; text-align:left; }
+ .heat { display:grid; grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); gap:4px; }
+ .cell { border-radius:6px; padding:.45rem .3rem; font-size:.7rem; text-align:center; color:#0f172a; font-weight:600;
+         overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:default; }
+</style>
+</head>
+<body>
+<header>
+ <h1>ServerScope Dashboard</h1>
+ <span>{{ generated_at }} · {{ servers | length }} servers</span>
+</header>
+<div class="grid">
+ <div class="panel"><h2>Classification</h2><canvas id="cls"></canvas></div>
+ <div class="panel"><h2>Health score distribution</h2><canvas id="health"></canvas></div>
+ <div class="panel"><h2>CPU vs Memory (bubble = risk)</h2><canvas id="scatter"></canvas></div>
+ <div class="panel"><h2>Top idle servers</h2><canvas id="idle"></canvas></div>
+ <div class="panel"><h2>CPU trend (fleet average)</h2><canvas id="trend"></canvas></div>
+ <div class="panel"><h2>Filesystem usage (worst 15)</h2><canvas id="disk"></canvas></div>
+ <div class="panel" style="grid-column:1/-1"><h2>Health heat map</h2>
+   <div class="heat" id="heat"></div></div>
+ <div class="panel" style="grid-column:1/-1"><h2>Risk matrix</h2>
+  <table><tr><th>Server</th><th>Classification</th><th>Health</th><th>Risk</th>
+             <th>Idle %</th><th>Abandonment %</th><th>Recommendation</th></tr>
+  <tbody id="risk"></tbody></table></div>
+</div>
+<script id="data" type="application/json">{{ payload }}</script>
+<script>
+const D = JSON.parse(document.getElementById('data').textContent);
+const P = { color:'#94a3b8' };
+Chart.defaults.color = '#94a3b8';
+Chart.defaults.borderColor = '#334155';
+
+new Chart(cls, { type:'doughnut',
+ data:{ labels:Object.keys(D.classifications),
+        datasets:[{ data:Object.values(D.classifications),
+          backgroundColor:['#16a34a','#d97706','#dc2626','#ea580c','#9333ea','#0891b2','#6b7280','#2563eb','#db2777','#84cc16'] }] } });
+
+new Chart(health, { type:'bar',
+ data:{ labels:D.health_buckets.labels,
+        datasets:[{ label:'servers', data:D.health_buckets.counts, backgroundColor:'#2563eb' }] },
+ options:{ plugins:{legend:{display:false}} } });
+
+new Chart(scatter, { type:'bubble',
+ data:{ datasets:[{ label:'servers',
+   data:D.servers.map(s => ({x:s.cpu??0, y:s.mem??0, r:3+s.risk/12, host:s.host})),
+   backgroundColor:'rgba(37,99,235,.6)' }] },
+ options:{ scales:{ x:{title:{display:true,text:'CPU %'},min:0,max:100},
+                    y:{title:{display:true,text:'Memory %'},min:0,max:100} },
+   plugins:{ tooltip:{ callbacks:{ label: c => `${c.raw.host}: CPU ${c.raw.x.toFixed(1)}%, MEM ${c.raw.y.toFixed(1)}%` } },
+             legend:{display:false} } } });
+
+const idleTop = D.servers.slice().sort((a,b)=>b.idle-a.idle).slice(0,10);
+new Chart(idle, { type:'bar',
+ data:{ labels:idleTop.map(s=>s.host),
+        datasets:[{ label:'idle %', data:idleTop.map(s=>s.idle), backgroundColor:'#d97706' }] },
+ options:{ indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{min:0,max:100}} } });
+
+new Chart(trend, { type:'line',
+ data:{ labels:D.cpu_trend.labels,
+        datasets:[{ label:'fleet CPU %', data:D.cpu_trend.values,
+                    borderColor:'#2563eb', tension:.3, fill:false }] },
+ options:{ plugins:{legend:{display:false}} } });
+
+new Chart(disk, { type:'bar',
+ data:{ labels:D.disks.map(d=>d.label),
+        datasets:[{ label:'used %', data:D.disks.map(d=>d.pct),
+          backgroundColor:D.disks.map(d=>d.pct>90?'#dc2626':d.pct>75?'#d97706':'#16a34a') }] },
+ options:{ indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{min:0,max:100}} } });
+
+const heat = document.getElementById('heat');
+D.servers.forEach(s => {
+  const h = s.health, hue = Math.round(h*1.2); // 0=red,120=green
+  const el = document.createElement('div');
+  el.className = 'cell';
+  el.style.background = `hsl(${hue},70%,55%)`;
+  el.title = `${s.host} — health ${h}`;
+  el.textContent = s.host;
+  heat.appendChild(el);
+});
+
+const tbody = document.getElementById('risk');
+D.servers.slice().sort((a,b)=>b.risk-a.risk).forEach(s => {
+  const tr = document.createElement('tr');
+  [s.host, s.classification, s.health, s.risk, s.idle, s.abandon, s.recommendation]
+    .forEach(v => { const td = document.createElement('td'); td.textContent = v; tr.appendChild(td); });
+  tbody.appendChild(tr);
+});
+</script>
+</body>
+</html>

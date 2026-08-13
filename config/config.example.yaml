@@ -1,0 +1,104 @@
+# ServerScope configuration.
+# Secrets support indirection: "env:VAR_NAME", "file:/path/to/secret",
+# "vault:secret/data/path#key" (requires hvac + VAULT_ADDR/VAULT_TOKEN).
+
+storage:
+  path: ./serverscope.db
+
+concurrency:
+  max_parallel: 50          # simultaneous collections
+  rate_limit_per_sec: 20    # new connections per second
+  timeout_seconds: 60
+  retries: 3
+  retry_backoff_seconds: 2.0
+
+credentials:
+  linux_default:
+    kind: ssh
+    username: svc-discovery
+    private_key_path: ~/.ssh/id_ed25519
+    # password: env:SSH_PASSWORD
+  windows_default:
+    kind: winrm
+    username: CORP\svc-discovery
+    password: vault:secret/data/discovery#winrm_password
+    transport: ntlm          # ntlm | kerberos | credssp | ssl
+  ad_default:
+    kind: ldap
+    server: ldaps://dc01.corp.example.com
+    username: CORP\svc-discovery
+    password: env:AD_PASSWORD
+    base_dn: DC=corp,DC=example,DC=com
+  vcenter_default:
+    kind: api
+    endpoint: vcenter01.corp.example.com
+    username: discovery@vsphere.local
+    password: env:VCENTER_PASSWORD
+    verify_ssl: true
+  proxmox_default:
+    kind: api
+    endpoint: pve01.corp.example.com
+    username: root@pam
+    token_name: discovery
+    token_value: env:PVE_TOKEN
+  aws_default:
+    kind: cloud
+    profile: discovery       # or access_key/secret_key
+    regions: [eu-west-1, us-east-1]
+  azure_default:
+    kind: cloud
+    subscription_id: env:AZURE_SUBSCRIPTION_ID
+  gcp_default:
+    kind: cloud
+    project: my-project     # uses Application Default Credentials
+
+targets:
+  - name: linux-prod
+    collector: linux_ssh
+    credential: linux_default
+    hosts: [10.0.1.10, 10.0.1.11, app-db01.corp.example.com]
+    environment: production
+    business_unit: e-commerce
+  - name: windows-prod
+    collector: windows_winrm
+    credential: windows_default
+    hosts: [WINAPP01, WINAPP02]
+    environment: production
+  - name: corp-ad
+    collector: active_directory
+    credential: ad_default
+  - name: vcenter
+    collector: vmware_vcenter
+    credential: vcenter_default
+  - name: pve
+    collector: proxmox
+    credential: proxmox_default
+  - name: aws
+    collector: aws_ec2
+    credential: aws_default
+
+scoring:
+  weights:
+    performance: 0.30
+    security: 0.25
+    availability: 0.25
+    maintenance: 0.20
+  idle:
+    cpu_avg_threshold_pct: 5.0
+    hibernated_cpu_threshold_pct: 2.0
+    io_iops_threshold: 5.0
+    login_lookback_days: 90
+  thresholds:
+    overloaded_cpu_pct: 85.0
+    overloaded_mem_pct: 90.0
+    disk_full_pct: 90.0
+
+history:
+  windows_days: [1, 7, 30, 90, 365]
+
+report:
+  output_dir: ./reports
+  formats: [json, csv, markdown, html]
+
+dashboard:
+  output: ./reports/dashboard.html

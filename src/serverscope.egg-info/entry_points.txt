@@ -1,0 +1,20 @@
+[console_scripts]
+serverscope = serverscope.cli:main
+
+[serverscope.collectors]
+active_directory = serverscope.collector.ad.ldap_collector:ActiveDirectoryCollector
+aws_ec2 = serverscope.collector.cloud.aws:AwsEc2Collector
+azure_vm = serverscope.collector.cloud.azure:AzureVmCollector
+gcp_gce = serverscope.collector.cloud.gcp:GcpGceCollector
+linux_ssh = serverscope.collector.linux.ssh_collector:LinuxSSHCollector
+proxmox = serverscope.collector.proxmox.proxmox_collector:ProxmoxCollector
+vmware_vcenter = serverscope.collector.vmware.vcenter_collector:VCenterCollector
+windows_winrm = serverscope.collector.windows.winrm_collector:WindowsWinRMCollector
+
+[serverscope.reporters]
+csv = serverscope.report.csv_report:CsvReporter
+excel = serverscope.report.excel_report:ExcelReporter
+html = serverscope.report.html_report:HtmlReporter
+json = serverscope.report.json_report:JsonReporter
+markdown = serverscope.report.markdown_report:MarkdownReporter
+pdf = serverscope.report.pdf_report:PdfReporter
